@@ -1,302 +1,406 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ru">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>3D ISS Orbital Tracker</title>
+    <title>ISS 3D Tracker - High-Tech Edition</title>
     <style>
-        body {
-            margin: 0;
-            overflow: hidden;
-            background-color: #000;
-            font-family: 'Space Mono', monospace, sans-serif;
-            color: #fff;
-        }
-
-        /* Glassmorphic Dashboard Panel */
-        #dashboard {
+        body { margin: 0; overflow: hidden; background-color: #000; color: #fff; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        canvas { display: block; }
+        
+        /* Футуристичный UI */
+        #ui-panel {
             position: absolute;
-            top: 20px;
-            left: 20px;
-            width: 320px;
-            background: rgba(10, 15, 25, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            bottom: 30px;
+            left: 30px;
+            background: rgba(10, 15, 30, 0.6);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(0, 255, 255, 0.3);
             border-radius: 12px;
             padding: 20px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
-            z-index: 10;
-        }
-
-        h1 {
-            font-size: 1.2rem;
-            margin: 0 0 15px 0;
-            text-transform: uppercase;
-            letter-spacing: 2px;
-            color: #4db8ff;
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding-bottom: 10px;
-        }
-
-        .metric {
-            margin-bottom: 12px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .metric-label {
-            font-size: 0.85rem;
-            color: #8fa3b0;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-        }
-
-        .metric-value {
-            font-size: 1.1rem;
-            font-weight: bold;
-            color: #ffffff;
-            text-shadow: 0 0 8px rgba(255, 255, 255, 0.3);
-        }
-
-        #status {
-            margin-top: 15px;
-            font-size: 0.75rem;
-            color: #00e676;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .pulse {
-            width: 8px;
-            height: 8px;
-            background-color: #00e676;
-            border-radius: 50%;
-            animation: blink 1.5s infinite;
-        }
-
-        @keyframes blink {
-            0% { opacity: 1; box-shadow: 0 0 8px #00e676; }
-            50% { opacity: 0.2; box-shadow: none; }
-            100% { opacity: 1; box-shadow: 0 0 8px #00e676; }
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.1);
+            pointer-events: none;
         }
         
-        #loading {
-            position: absolute;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.5rem;
+        #ui-panel h1 {
+            margin: 0 0 10px 0;
+            font-size: 1.2rem;
+            color: #0ff;
+            text-transform: uppercase;
             letter-spacing: 2px;
-            color: #4db8ff;
-            z-index: 20;
         }
-    </style>
 
-    <script async src="https://unpkg.com/es-module-shims@1.8.0/dist/es-module-shims.js"></script>
-    
-    <script type="importmap">
-    {
-        "imports": {
-            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        .data-row {
+            margin: 5px 0;
+            font-size: 0.9rem;
+            display: flex;
+            justify-content: space-between;
+            width: 250px;
         }
-    }
-    </script>
+
+        .data-label { color: #aaa; }
+        .data-value { font-weight: bold; font-family: monospace; color: #fff; text-shadow: 0 0 5px #0ff; }
+
+        /* Панель города */
+        #city-info {
+            position: absolute;
+            top: 30px;
+            right: -300px; /* Скрыто по умолчанию */
+            width: 250px;
+            background: rgba(10, 15, 30, 0.8);
+            backdrop-filter: blur(10px);
+            border-left: 3px solid #0ff;
+            padding: 20px;
+            transition: right 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+        }
+        #city-info.active { right: 30px; }
+        #city-name { font-size: 1.5rem; color: #0ff; margin-bottom: 5px; }
+        #city-country { font-size: 0.9rem; color: #aaa; margin-bottom: 15px; }
+        
+        /* Кнопка локации */
+        #geo-btn {
+            position: absolute;
+            top: 30px;
+            left: 30px;
+            background: rgba(0, 255, 255, 0.1);
+            border: 1px solid #0ff;
+            color: #0ff;
+            padding: 10px 15px;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s ease;
+        }
+        #geo-btn:hover { background: rgba(0, 255, 255, 0.3); box-shadow: 0 0 15px #0ff; }
+    </style>
 </head>
 <body>
 
-    <div id="loading">INITIALIZING TELEMETRY...</div>
+    <button id="geo-btn">Найти меня</button>
 
-    <div id="dashboard" style="display: none;">
+    <div id="ui-panel">
         <h1>ISS Telemetry</h1>
-        <div class="metric">
-            <span class="metric-label">Latitude</span>
-            <span class="metric-value" id="lat-val">--</span>
-        </div>
-        <div class="metric">
-            <span class="metric-label">Longitude</span>
-            <span class="metric-value" id="lon-val">--</span>
-        </div>
-        <div class="metric">
-            <span class="metric-label">Altitude</span>
-            <span class="metric-value" id="alt-val">-- km</span>
-        </div>
-        <div class="metric">
-            <span class="metric-label">Velocity</span>
-            <span class="metric-value" id="vel-val">-- km/h</span>
-        </div>
-        <div id="status">
-            <div class="pulse"></div> Live Data Link
-        </div>
+        <div class="data-row"><span class="data-label">Широта:</span> <span class="data-value" id="iss-lat">--</span></div>
+        <div class="data-row"><span class="data-label">Долгота:</span> <span class="data-value" id="iss-lng">--</span></div>
+        <div class="data-row"><span class="data-label">Высота:</span> <span class="data-value" id="iss-alt">--</span></div>
+        <div class="data-row"><span class="data-label">Скорость:</span> <span class="data-value" id="iss-vel">--</span></div>
     </div>
+
+    <div id="city-info">
+        <div id="city-name">--</div>
+        <div id="city-country">--</div>
+        <div id="city-desc">--</div>
+    </div>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
 
     <script type="module">
         import * as THREE from 'three';
         import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
-        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
-        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 
-        // --- 1. Scene Setup ---
+        // --- 1. БАЗОВАЯ НАСТРОЙКА СЦЕНЫ ---
         const scene = new THREE.Scene();
         const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
-        camera.position.set(0, 0, 4);
+        camera.position.set(0, 0, 4); // Радиус Земли 1, камера на 4
 
-        const renderer = new THREE.WebGLRenderer({ antialias: false, powerPreference: "high-performance" });
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
-        // Optimize for Bloom
-        renderer.toneMapping = THREE.ReinhardToneMapping;
         document.body.appendChild(renderer.domElement);
 
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
         controls.dampingFactor = 0.05;
-        controls.minDistance = 1.2;
+        controls.minDistance = 1.2; // Не даем провалиться в текстуру
         controls.maxDistance = 10;
 
-        // --- 2. Bloom Post-Processing ---
-        const renderScene = new RenderPass(scene, camera);
-        // Resolution, strength, radius, threshold
-        const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
-        bloomPass.threshold = 1.0; // Only bloom items with color > 1.0 (our ISS beacon)
-        bloomPass.strength = 2.0;
-        bloomPass.radius = 0.5;
+        const EARTH_RADIUS = 1;
 
-        const composer = new EffectComposer(renderer);
-        composer.addPass(renderScene);
-        composer.addPass(bloomPass);
-
-        // --- 3. Earth Object ---
-        const earthRadius = 1;
-        const earthGeometry = new THREE.SphereGeometry(earthRadius, 64, 64);
-        
-        const textureLoader = new THREE.TextureLoader();
-        // Using unpkg for reliable, high-res generic textures
-        const earthTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg');
-        
-        const earthMaterial = new THREE.MeshStandardMaterial({
-            map: earthTexture,
-            roughness: 0.6,
-            metalness: 0.1
-        });
-        
-        const earth = new THREE.Mesh(earthGeometry, earthMaterial);
-        // Rotate earth to align texture with standard lat/lng coordinates 
-        earth.rotation.y = -Math.PI / 2; 
-        scene.add(earth);
-
-        // --- 4. ISS Beacon (Glassmorphic Glowing Sphere) ---
-        const issGeometry = new THREE.SphereGeometry(0.015, 16, 16);
-        const issMaterial = new THREE.MeshBasicMaterial({ 
-            color: new THREE.Color(4.0, 8.0, 10.0) // Values > 1 trigger the BloomPass threshold
-        });
-        const iss = new THREE.Mesh(issGeometry, issMaterial);
-        scene.add(iss);
-
-        // --- 5. Real-Time Solar Ephemeris Math ---
-        // Calculates the Sub-Solar point (where the sun is directly overhead) based on current UTC
-        function updateSolarLighting() {
-            const now = new Date();
-            
-            // Calculate Day of Year
-            const start = new Date(now.getUTCFullYear(), 0, 0);
-            const diff = now - start;
-            const dayOfYear = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-            // Solar Declination (Latitude of sub-solar point)
-            const declination = -23.44 * Math.cos((360 / 365.24) * (dayOfYear + 10) * (Math.PI / 180));
-
-            // Solar Longitude (Moves 15 degrees per hour from Greenwich)
-            const utcHours = now.getUTCHours() + now.getUTCMinutes() / 60 + now.getUTCSeconds() / 3600;
-            const longitude = (12 - utcHours) * 15;
-
-            // Convert to 3D Vector
-            const sunPos = latLongToVector3(declination, longitude, 5); // 5 units away
-            
-            return sunPos;
-        }
-
-        const sunLight = new THREE.DirectionalLight(0xffffff, 2.5);
-        scene.add(sunLight);
-        
-        // Faint ambient light so the dark side is dimly visible
-        const ambientLight = new THREE.AmbientLight(0x111122, 0.1);
-        scene.add(ambientLight);
-
-        // --- 6. Coordinate Math Function ---
+        // --- 2. ВСПОМОГАТЕЛЬНАЯ МАТЕМАТИКА ---
+        // Конвертация Lat/Lon в Vector3
         function latLongToVector3(lat, lon, radius) {
             const phi = (90 - lat) * (Math.PI / 180);
             const theta = (lon + 180) * (Math.PI / 180);
-
             const x = -(radius * Math.sin(phi) * Math.cos(theta));
             const z = (radius * Math.sin(phi) * Math.sin(theta));
             const y = (radius * Math.cos(phi));
-
             return new THREE.Vector3(x, y, z);
         }
 
-        // --- 7. API Fetch Loop & UI Updates ---
-        let targetISSPosition = new THREE.Vector3();
+        // Вычисление вектора Солнца (упрощенно по UTC)
+        function getSunVector() {
+            const now = new Date();
+            const dayOfYear = Math.floor((now - new Date(now.getFullYear(), 0, 0)) / 1000 / 60 / 60 / 24);
+            const declination = 23.45 * Math.sin((284 + dayOfYear) * (2 * Math.PI / 365)); // Широта солнца
+            const utcHour = now.getUTCHours() + now.getUTCMinutes() / 60;
+            const lon = (12 - utcHour) * 15; // Долгота солнца
+            return latLongToVector3(declination, lon, 1).normalize();
+        }
+
+        // --- 3. ЗЕМЛЯ (Шейдеры дня и ночи) ---
+        const textureLoader = new THREE.TextureLoader();
+        // ЗАМЕНИТЕ ЭТИ ССЫЛКИ НА ВАШИ ВЫСОКОРАЗРЕШЕННЫЕ ТЕКСТУРЫ
+        const dayTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg'); 
+        const nightTexture = textureLoader.load('https://unpkg.com/three-globe/example/img/earth-night.jpg');
+
+        const earthGeometry = new THREE.SphereGeometry(EARTH_RADIUS, 64, 64);
         
+        // Кастомный шейдер для идеального перехода день/ночь по вектору Солнца
+        const earthMaterial = new THREE.ShaderMaterial({
+            uniforms: {
+                dayTexture: { value: dayTexture },
+                nightTexture: { value: nightTexture },
+                sunDirection: { value: getSunVector() }
+            },
+            vertexShader: `
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                void main() {
+                    vUv = uv;
+                    vNormal = normalize(normalMatrix * normal);
+                    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+                }
+            `,
+            fragmentShader: `
+                uniform sampler2D dayTexture;
+                uniform sampler2D nightTexture;
+                uniform vec3 sunDirection;
+                
+                varying vec2 vUv;
+                varying vec3 vNormal;
+                
+                void main() {
+                    vec3 dayColor = texture2D(dayTexture, vUv).rgb;
+                    vec3 nightColor = texture2D(nightTexture, vUv).rgb;
+                    
+                    // Вычисляем освещенность (dot product нормали и вектора на солнце)
+                    float intensity = dot(vNormal, sunDirection);
+                    
+                    // Плавный переход на терминаторе (граница света и тени)
+                    float blend = smoothstep(-0.2, 0.2, intensity);
+                    
+                    // Усиливаем ночные огни и смешиваем
+                    vec3 finalColor = mix(nightColor * 1.5, dayColor * max(intensity, 0.0), blend);
+                    
+                    gl_FragColor = vec4(finalColor, 1.0);
+                }
+            `
+        });
+
+        const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+        scene.add(earth);
+
+        // Атмосфера (Простое свечение)
+        const atmosGeometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.05, 64, 64);
+        const atmosMaterial = new THREE.MeshBasicMaterial({
+            color: 0x00aaff,
+            transparent: true,
+            opacity: 0.15,
+            blending: THREE.AdditiveBlending,
+            side: THREE.BackSide
+        });
+        const atmosphere = new THREE.Mesh(atmosGeometry, atmosMaterial);
+        scene.add(atmosphere);
+
+        // --- 4. МКС И ШЛЕЙФ ---
+        const issGeometry = new THREE.SphereGeometry(0.015, 16, 16);
+        const issMaterial = new THREE.MeshBasicMaterial({ color: 0x00ffff }); // Неоновый цвет
+        const issMesh = new THREE.Mesh(issGeometry, issMaterial);
+        
+        // Свечение МКС
+        const issGlow = new THREE.PointLight(0x00ffff, 1, 0.5);
+        issMesh.add(issGlow);
+        scene.add(issMesh);
+
+        // Шлейф МКС
+        const trailMaterial = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5 });
+        const trailGeometry = new THREE.BufferGeometry();
+        const maxTrailPoints = 100; // Длина шлейфа
+        const trailPoints = [];
+        const trailLine = new THREE.Line(trailGeometry, trailMaterial);
+        scene.add(trailLine);
+
+        let issTargetPos = new THREE.Vector3();
+        let issCurrentPos = new THREE.Vector3();
+
+        // --- 5. ДАННЫЕ МКС (API) ---
         async function fetchISSData() {
             try {
                 const response = await fetch('https://api.wheretheiss.at/v1/satellites/25544');
                 const data = await response.json();
+                
+                // Обновление UI
+                document.getElementById('iss-lat').innerText = data.latitude.toFixed(4) + '°';
+                document.getElementById('iss-lng').innerText = data.longitude.toFixed(4) + '°';
+                document.getElementById('iss-alt').innerText = data.altitude.toFixed(2) + ' км';
+                document.getElementById('iss-vel').innerText = data.velocity.toFixed(2) + ' км/ч';
 
-                // Update UI
-                document.getElementById('lat-val').innerText = data.latitude.toFixed(4) + '°';
-                document.getElementById('lon-val').innerText = data.longitude.toFixed(4) + '°';
-                document.getElementById('alt-val').innerText = data.altitude.toFixed(2) + ' km';
-                document.getElementById('vel-val').innerText = Math.round(data.velocity).toLocaleString() + ' km/h';
-
-                // Hide Loading, Show Dashboard
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('dashboard').style.display = 'block';
-
-                // Calculate exact 3D position 
-                // We add a tiny offset to the radius so the beacon hovers just above the surface map
-                const altitudeScale = 1.0 + (data.altitude / 6371); // Earth radius is ~6371km
-                targetISSPosition = latLongToVector3(data.latitude, data.longitude, altitudeScale);
+                // Масштабируем высоту: 400км / 6371км(радиус земли) = ~0.063
+                const altitudeScale = 1 + (data.altitude / 6371); 
+                issTargetPos.copy(latLongToVector3(data.latitude, data.longitude, EARTH_RADIUS * altitudeScale));
+                
+                // Инициализация при первом запуске
+                if(issCurrentPos.length() === 0) {
+                    issCurrentPos.copy(issTargetPos);
+                    issMesh.position.copy(issCurrentPos);
+                }
 
             } catch (error) {
-                console.error("Error fetching ISS Telemetry:", error);
+                console.error('Ошибка получения данных МКС:', error);
             }
         }
-
-        // Initial fetch and 5-second interval loop
-        fetchISSData();
+        
         setInterval(fetchISSData, 5000);
+        fetchISSData();
 
-        // --- 8. Animation Loop ---
+        // --- 6. ГОРОДА И ИНТЕРАКТИВНОСТЬ ---
+        // Пример базы данных городов
+        const cities = [
+            { name: "Лондон", country: "Великобритания", lat: 51.5074, lng: -0.1278, desc: "Столица UK, нулевой меридиан." },
+            { name: "Токио", country: "Япония", lat: 35.6762, lng: 139.6503, desc: "Крупнейший мегаполис." },
+            { name: "Нью-Йорк", country: "США", lat: 40.7128, lng: -74.0060, desc: "Город, который никогда не спит." },
+            { name: "Москва", country: "Россия", lat: 55.7558, lng: 37.6173, desc: "Столица России." }
+        ];
+
+        const cityMarkers = [];
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+
+        cities.forEach(city => {
+            const pos = latLongToVector3(city.lat, city.lng, EARTH_RADIUS * 1.001);
+            
+            // Маркер города
+            const markerGeo = new THREE.SphereGeometry(0.005, 8, 8);
+            const markerMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+            const marker = new THREE.Mesh(markerGeo, markerMat);
+            marker.position.copy(pos);
+            marker.userData = city; // Сохраняем данные для клика
+            
+            scene.add(marker);
+            cityMarkers.push(marker);
+
+            // Теплый свет мегаполиса
+            const cityLight = new THREE.PointLight(0xffaa00, 0.5, 0.1);
+            cityLight.position.copy(pos);
+            scene.add(cityLight);
+        });
+
+        // Клик по городу
+        window.addEventListener('click', (event) => {
+            if (event.target.id === 'geo-btn') return; // Игнорируем клик по кнопке
+
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cityMarkers);
+
+            if (intersects.length > 0) {
+                const data = intersects[0].object.userData;
+                const targetPos = intersects[0].object.position;
+
+                // Плавное перемещение камеры
+                const newCamPos = targetPos.clone().multiplyScalar(1.5); // Зумируем к точке
+                // Здесь в идеале использовать GSAP, но сделаем через простое lerp в render loop
+                targetCameraPos.copy(newCamPos);
+
+                // Показ UI
+                document.getElementById('city-name').innerText = data.name;
+                document.getElementById('city-country').innerText = data.country;
+                document.getElementById('city-desc').innerText = data.desc;
+                document.getElementById('city-info').classList.add('active');
+            } else {
+                document.getElementById('city-info').classList.remove('active');
+                targetCameraPos.set(0,0,0); // Сброс таргета
+            }
+        });
+
+        let targetCameraPos = new THREE.Vector3();
+
+        // --- 7. ГЕОЛОКАЦИЯ ПОЛЬЗОВАТЕЛЯ ---
+        let userMarker;
+        document.getElementById('geo-btn').addEventListener('click', () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const { latitude, longitude } = position.coords;
+                    const pos = latLongToVector3(latitude, longitude, EARTH_RADIUS * 1.002);
+
+                    if(!userMarker) {
+                        const markerGeo = new THREE.SphereGeometry(0.008, 16, 16);
+                        const markerMat = new THREE.MeshBasicMaterial({ color: 0xff0044, transparent: true, opacity: 0.8 });
+                        userMarker = new THREE.Mesh(markerGeo, markerMat);
+                        scene.add(userMarker);
+                        
+                        // Пульсирующий свет
+                        const userLight = new THREE.PointLight(0xff0044, 2, 0.2);
+                        userMarker.add(userLight);
+                    }
+                    userMarker.position.copy(pos);
+                    
+                    // Поворачиваем камеру к пользователю
+                    targetCameraPos.copy(pos.clone().multiplyScalar(2));
+                    
+                }, () => { alert('Доступ к геолокации запрещен.'); });
+            } else {
+                alert('Ваш браузер не поддерживает геолокацию.');
+            }
+        });
+
+        // --- 8. АНИМАЦИЯ И РЕНДЕР ---
+        const clock = new THREE.Clock();
+
         function animate() {
             requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
             controls.update();
 
-            // Smoothly interpolate ISS position so it doesn't jump every 5 seconds
-            if (targetISSPosition.length() > 0) {
-                iss.position.lerp(targetISSPosition, 0.02);
+            // Обновляем позицию солнца в шейдере
+            earthMaterial.uniforms.sunDirection.value = getSunVector();
+
+            // Плавное движение МКС (Lerp)
+            if (issTargetPos.length() > 0) {
+                issCurrentPos.lerp(issTargetPos, delta * 0.5); // 0.5 - скорость интерполяции
+                issMesh.position.copy(issCurrentPos);
+
+                // Обновление шлейфа
+                trailPoints.push(issCurrentPos.clone());
+                if (trailPoints.length > maxTrailPoints) {
+                    trailPoints.shift();
+                }
+                trailGeometry.setFromPoints(trailPoints);
             }
 
-            // Continuously update Sun position based on accurate system time
-            const sunPosition = updateSolarLighting();
-            sunLight.position.copy(sunPosition);
+            // Пульсация маркера пользователя
+            if (userMarker) {
+                const scale = 1 + Math.sin(Date.now() * 0.005) * 0.3;
+                userMarker.scale.set(scale, scale, scale);
+            }
 
-            // Use the EffectComposer for bloom rendering instead of standard renderer
-            composer.render();
+            // Плавное приближение камеры при клике на город
+            if(targetCameraPos.length() > 0) {
+                camera.position.lerp(targetCameraPos, delta * 2);
+                // Чтобы камера смотрела на центр земли
+                controls.target.set(0,0,0); 
+            }
+
+            renderer.render(scene, camera);
         }
 
-        animate();
-
-        // Handle Window Resizing
+        // Обработка ресайза
         window.addEventListener('resize', () => {
             camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            composer.setSize(window.innerWidth, window.innerHeight);
         });
+
+        animate();
     </script>
 </body>
 </html>
